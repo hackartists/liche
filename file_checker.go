@@ -29,7 +29,7 @@ func (c fileChecker) Check(f string) ([]urlResult, error) {
 		return nil, err
 	}
 
-	us, err := c.extractURLs(n)
+	us, err := c.extractReferences(n)
 
 	if err != nil {
 		return nil, err
@@ -90,6 +90,46 @@ func (c fileChecker) parseFile(f string) (*html.Node, error) {
 	return n, nil
 }
 
+func (c fileChecker) extractReferences(n *html.Node) ([]string, error) {
+	us := make(map[string]bool)
+	ns := []*html.Node{n}
+
+	for len(ns) > 0 {
+		i := len(ns) - 1
+		n := ns[i]
+		ns = ns[:i]
+
+		if n.Type == html.ElementNode {
+			switch n.Data {
+			case "a":
+				for _, a := range n.Attr {
+					if a.Key == "href" {
+						// Skip if mailto:
+						if strings.HasPrefix(a.Val, "mailto:") == false {
+							us[a.Val] = true
+						}
+						break
+					}
+				}
+			case "img":
+				for _, a := range n.Attr {
+					if a.Key == "src" {
+						if strings.HasPrefix(a.Val, "mailto:") == false {
+							us[a.Val] = true
+						}
+						break
+					}
+				}
+			}
+		}
+
+		for n := n.FirstChild; n != nil; n = n.NextSibling {
+			ns = append(ns, n)
+		}
+	}
+
+	return stringSetToSlice(us), nil
+}
 func (c fileChecker) extractURLs(n *html.Node) ([]string, error) {
 	us := make(map[string]bool)
 	ns := []*html.Node{n}

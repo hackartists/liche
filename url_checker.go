@@ -26,7 +26,7 @@ func newURLChecker(t time.Duration, d string, r *regexp.Regexp, s semaphore) url
 }
 
 func (c urlChecker) Check(u string, f string) error {
-	u, local, err := c.resolveURL(u, f)
+	u, frag, local, err := c.resolveURLWithFragment(u, f)
 	if err != nil {
 		return err
 	}
@@ -36,7 +36,18 @@ func (c urlChecker) Check(u string, f string) error {
 	}
 
 	if local {
-		_, err := os.Stat(u)
+		if u == c.documentRoot || u == filepath.Dir(f) {
+			// same file
+			if len(frag) > 0 {
+				err = mdAnchors.CheckAnchor(f, frag)
+			}
+		} else {
+			// different file
+			_, err = os.Stat(u)
+			if len(frag) > 0 {
+				err = mdAnchors.CheckAnchor(u, frag)
+			}
+		}
 		return err
 	}
 
@@ -49,7 +60,7 @@ func (c urlChecker) Check(u string, f string) error {
 	} else {
 		sc, _, err = fasthttp.GetTimeout(nil, u, c.timeout)
 	}
-	if sc >= http.StatusBadRequest {
+	if sc != http.StatusOK {
 		return fmt.Errorf("%s (HTTP error %d)", http.StatusText(sc), sc)
 	}
 	// Ignore errors from fasthttp about small buffer for URL headers,
@@ -74,6 +85,28 @@ func (c urlChecker) CheckMany(us []string, f string, rc chan<- urlResult) {
 
 	wg.Wait()
 	close(rc)
+}
+
+func (c urlChecker) resolveURLWithFragment(u string, f string) (string, string, bool, error) {
+	uu, err := url.Parse(u)
+
+	if err != nil {
+		return "", "", false, err
+	}
+
+	if uu.Scheme != "" {
+		return u, "", false, nil
+	}
+
+	if !path.IsAbs(uu.Path) {
+		return path.Join(filepath.Dir(f), uu.Path), uu.Fragment, true, nil
+	}
+
+	if c.documentRoot == "" {
+		return "", "", false, fmt.Errorf("document root directory is not specified")
+	}
+
+	return path.Join(c.documentRoot, uu.Path), uu.Fragment, true, nil
 }
 
 func (c urlChecker) resolveURL(u string, f string) (string, bool, error) {
