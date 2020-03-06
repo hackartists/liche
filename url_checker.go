@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"path"
@@ -43,11 +44,17 @@ func (c urlChecker) Check(u string, f string) error {
 	defer c.semaphore.Release()
 
 	if c.timeout == 0 {
-		_, _, err := fasthttp.Get(nil, u)
+		statusCode, _, err := fasthttp.Get(nil, u)
+		if statusCode != 200 {
+			return fmt.Errorf("status code = %d for url %s", statusCode, u)
+		}
 		return err
 	}
 
-	_, _, err = fasthttp.GetTimeout(nil, u, c.timeout)
+	statusCode, _, err := fasthttp.GetTimeout(nil, u, c.timeout)
+	if statusCode != 200 {
+		return fmt.Errorf("status code = %d for url %s", statusCode, u)
+	}
 	return err
 }
 
