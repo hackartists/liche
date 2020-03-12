@@ -36,6 +36,10 @@ func main() {
 		args.excludedPattern,
 		newSemaphore(args.concurrency))
 
+	options := MdAnchorOption(0)
+	if args.genHeaderId { options |= GenAutoHeader }
+	mdAnchors = newMdAnchors(options)
+
 	go c.CheckMany(m.Filenames(), rc)
 
 	ok := true

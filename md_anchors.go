@@ -9,11 +9,23 @@ import (
 	"sync"
 )
 
-var mdAnchors *MdAnchors = &MdAnchors{anchors: make(map[string]map[string]bool)}
+type MdAnchorOption int
+
+const (
+	NoOption MdAnchorOption = 0
+	GenAutoHeader = 1 << iota
+)
+
+var mdAnchors *MdAnchors = newMdAnchors(NoOption)
 
 type MdAnchors struct {
 	anchors map[string]map[string]bool
+	option MdAnchorOption
 	lock sync.Mutex
+}
+
+func newMdAnchors(option MdAnchorOption) *MdAnchors {
+	return &MdAnchors{anchors: make(map[string]map[string]bool), option:option}
 }
 
 func (m *MdAnchors) CheckAnchor(filename, anchor string) error {
@@ -47,7 +59,13 @@ func (m *MdAnchors) parseFile(filename string) error {
 		return errors.New("not md file")
 	}
 
-	bs = blackfriday.Run(bs, blackfriday.WithExtensions(blackfriday.CommonExtensions), blackfriday.WithExtensions(blackfriday.AutoHeadingIDs))
+	var options []blackfriday.Option
+
+	if m.option & GenAutoHeader != 0 {
+		options = append(options, blackfriday.WithExtensions(blackfriday.AutoHeadingIDs))
+	}
+
+	bs = blackfriday.Run(bs, options...)
 
 	n, err := html.Parse(bytes.NewReader(bs))
 	if err != nil {

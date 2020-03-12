@@ -14,7 +14,7 @@ const defaultConcurrency = maxOpenFiles / 2
 const usage = `Link checker for Markdown and HTML
 
 Usage:
-	liche [-c <num-requests>] [-d <directory>] [-r] [-t <timeout>] [-x <regex>] [-v] <filenames>...
+	liche [-c <num-requests>] [-d <directory>] [-r] [-t <timeout>] [-x <regex>] [-g] [-v] <filenames>...
 
 Options:
 	-c, --concurrency <num-requests>  Set max number of concurrent HTTP requests. [default: %v]
@@ -22,6 +22,7 @@ Options:
 	-r, --recursive  Search Markdown and HTML files recursively
 	-t, --timeout <timeout>  Set timeout for HTTP requests in seconds. Disabled by default.
 	-x, --exclude <regex>  Regex of links to exclude from checking.
+	-g, --gen-header-id  Generate header IDs when extracting anchors from md files.
 	-v, --verbose  Be verbose.`
 
 type arguments struct {
@@ -32,6 +33,7 @@ type arguments struct {
 	excludedPattern *regexp.Regexp
 	recursive       bool
 	verbose         bool
+	genHeaderId     bool
 }
 
 func getArguments(argv []string) (arguments, error) {
@@ -79,5 +81,6 @@ func getArguments(argv []string) (arguments, error) {
 		r,
 		args["--recursive"].(bool),
 		args["--verbose"].(bool),
+		args["--gen-header-id"].(bool),
 	}, nil
 }
