@@ -61,7 +61,7 @@ func (c urlChecker) Check(u string, f string) error {
 		sc, _, err = fasthttp.GetTimeout(nil, u, c.timeout)
 	}
 	if sc != http.StatusOK {
-		return fmt.Errorf("%s (HTTP error %d)", http.StatusText(sc), sc)
+		return fmt.Errorf("%s (HTTP error %d), err: %s", http.StatusText(sc), sc, err)
 	}
 	// Ignore errors from fasthttp about small buffer for URL headers,
 	// the content is discarded anyway.
