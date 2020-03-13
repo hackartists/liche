@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -24,6 +23,28 @@ type urlChecker struct {
 
 func newURLChecker(t time.Duration, d string, r *regexp.Regexp, s semaphore) urlChecker {
 	return urlChecker{t, d, r, s}
+}
+
+func (c urlChecker) GetHTTPResponse(u string, timeout time.Duration) (error, int) {
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+
+	req.SetRequestURI(u)
+	req.Header.SetMethod("HEAD")
+
+	var err error
+
+	if timeout == 0 {
+		err = fasthttp.Do(req, resp)
+	} else {
+		err = fasthttp.DoTimeout(req, resp, timeout)
+	}
+
+	if err != nil {
+		return err, 0
+	}
+
+	return nil, resp.StatusCode()
 }
 
 func (c urlChecker) Check(u string, f string) error {
@@ -55,19 +76,17 @@ func (c urlChecker) Check(u string, f string) error {
 	c.semaphore.Request()
 	defer c.semaphore.Release()
 
-	var sc int
-	if c.timeout == 0 {
-		sc, _, err = fasthttp.Get(nil, u)
-	} else {
-		sc, _, err = fasthttp.GetTimeout(nil, u, c.timeout)
-	}
-	if sc != http.StatusOK {
+	err, sc := c.GetHTTPResponse(u, c.timeout)
+	if err != nil {
+		// Skip if small header.
 		if strings.HasPrefix(err.Error(), "error when reading response headers: small read buffer. Increase ReadBufferSize.") {
-			// skip returning error if the reasons is small buffer.
 			return nil
-		} else {
-			return fmt.Errorf("%s (HTTP error %d), err: %s", http.StatusText(sc), sc, err)
 		}
+		return err
+	}
+	if sc >= fasthttp.StatusBadRequest && sc != fasthttp.StatusUnsupportedMediaType &&
+		sc != fasthttp.StatusMethodNotAllowed {
+		return fmt.Errorf("%s (HTTP error %d)", fasthttp.StatusMessage(sc), sc)
 	}
 	// Ignore errors from fasthttp about small buffer for URL headers,
 	// the content is discarded anyway.
